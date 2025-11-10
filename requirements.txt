@@ -1,0 +1,10 @@
+torch>=2.0.0
+transformers>=4.38.0
+sentence-transformers
+faiss-cpu
+langchain
+fastapi
+uvicorn
+Pillow
+numpy
+nltk
