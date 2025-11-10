@@ -1,10 +1,21 @@
+# Virtual env & build
 venv/
+.env
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.DS_Store
-.env
-*.pth
-*.log
+*.egg-info/
+.dist/
+build/
+dist/
 
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Logs & misc
+*.log
+*.pth
+.ipynb_checkpoints/
