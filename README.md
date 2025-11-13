@@ -15,13 +15,6 @@ Integrates **LLaVA**, **BLIP-2**, and **LangChain RAG** for contextual image rea
 
 ---
 
-## 🧩 Example
-**Input:** Image of a person riding a horse  
-**Query:** “Describe the scene in detail”  
-**Output:** “A person is riding a brown horse on a grassy field under sunlight.”
-
----
-
 ## 🧠 Tech Stack
 **PyTorch**, **Transformers**, **BLIP-2**, **LangChain**, **FAISS**, **FastAPI**, **CUDA**
 
