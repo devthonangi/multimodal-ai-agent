@@ -18,5 +18,3 @@ Integrates **LLaVA**, **BLIP-2**, and a **LLaMA-based language model** with **La
 ## 🧠 Tech Stack
 **PyTorch**, **Transformers**, **LLaMA**, **BLIP-2**, **LLaVA**,  
 **LangChain**, **FAISS**, **FastAPI**, **CUDA**
-
-![GitHub](https://img.shields.io/badge/Multimodal--AI--Agent-active-green?style=for-the-badge)
