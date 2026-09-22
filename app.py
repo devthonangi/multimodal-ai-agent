@@ -67,7 +67,7 @@ async def warmup():
 async def query_image(
     image: UploadFile = File(...),
     question: str = Form(..., min_length=1, max_length=500),
-    context: str | None = Form(default=None, max_length=2000),
+    context: str | None = Form(default=None, max_length=8000),
 ):
     if image.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=415, detail="Use a JPEG, PNG, or WebP image")

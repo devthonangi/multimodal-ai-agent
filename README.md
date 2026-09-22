@@ -2,6 +2,8 @@
 
 A free, private image-question-answering app powered by SmolVLM and Apple MLX, with a simple browser interface, FastAPI API, lazy model loading, and response caching.
 
+The browser interface keeps one image as visual context, supports multi-turn follow-up questions, and includes one-click OCR for visible text.
+
 ## What changed in v2
 
 - The API starts immediately instead of loading multiple large models during import.
