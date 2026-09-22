@@ -1,74 +1,45 @@
-import base64
-import io
-import os
+import tempfile
+from pathlib import Path
 
-import requests
+from mlx_vlm import generate, load
+from mlx_vlm.prompt_utils import apply_chat_template
+from mlx_vlm.utils import load_config
 
 
-DEFAULT_MODEL = "nvidia/cosmos3-nano-reasoner"
-DEFAULT_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+DEFAULT_MODEL = "HuggingFaceTB/SmolVLM-500M-Instruct"
 
 
 class TextReasoner:
-    """High-quality multimodal reasoning through NVIDIA NIM."""
+    """Free local vision-language reasoning accelerated by Apple MLX."""
 
     def __init__(self, device, model_name=DEFAULT_MODEL):
-        self.device = "nvidia-nim"
+        self.device = "mlx-metal"
         self.model_name = model_name
-        self.api_url = os.getenv("NVIDIA_API_URL", DEFAULT_API_URL)
-        self.api_key = os.getenv("NVIDIA_API_KEY")
-        if not self.api_key:
-            raise RuntimeError(
-                "NVIDIA_API_KEY is not configured. Copy .env.example to .env and add a key from build.nvidia.com."
-            )
+        print(f"[model] Loading {model_name} with MLX")
+        self.model, self.processor = load(model_name)
+        self.config = load_config(model_name)
 
     def generate(self, query, context, image):
         prompt = self._build_prompt(query, context)
-        image_data = self._encode_image(image)
-        response = requests.post(
-            self.api_url,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.model_name,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{image_data}"},
-                            },
-                        ],
-                    }
-                ],
-                "max_tokens": 4096,
-                "temperature": 0.2,
-            },
-            timeout=120,
-        )
-        if not response.ok:
-            try:
-                detail = response.json().get("detail") or response.json().get("message")
-            except ValueError:
-                detail = response.text[:300]
-            raise RuntimeError(f"NVIDIA API returned {response.status_code}: {detail or 'request failed'}")
-        payload = response.json()
+        formatted = apply_chat_template(self.processor, self.config, prompt, num_images=1)
+        temp_path = None
         try:
-            answer = payload["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as error:
-            raise RuntimeError("NVIDIA API returned an unexpected response") from error
-        return answer.strip()
-
-    @staticmethod
-    def _encode_image(image):
-        output = io.BytesIO()
-        image.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
-        return base64.b64encode(output.getvalue()).decode("ascii")
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
+                temp_path = Path(temp_file.name)
+                image.convert("RGB").save(temp_file, format="JPEG", quality=92)
+            output = generate(
+                self.model,
+                self.processor,
+                formatted,
+                [str(temp_path)],
+                max_tokens=220,
+                temperature=0.0,
+                verbose=False,
+            )
+        finally:
+            if temp_path:
+                temp_path.unlink(missing_ok=True)
+        return getattr(output, "text", output).strip()
 
     @staticmethod
     def _build_prompt(query, context=None):
@@ -80,17 +51,14 @@ class TextReasoner:
             "describe the image",
         }:
             prompt = (
-                "Analyze this scene using physical-world reasoning. In 2 to 4 complete sentences, identify "
-                "the main subjects, setting, actions, object states, spatial relationships, visible text, "
-                "and notable details. Separate direct observations from uncertain inferences and do not guess."
+                "Describe this image accurately in 2 to 4 complete sentences. Identify the main subjects, "
+                "setting, actions, visible text, spatial relationships, and notable details. Do not guess."
             )
         else:
             prompt = (
-                f"Answer this question about the image: {query.strip()}\n"
-                "Give a clear answer grounded in visible evidence and physical-world reasoning. Consider object "
-                "states, space, motion, causality, and likely next events only when relevant. Separate observations "
-                "from inferences. If the answer cannot be determined, say so plainly."
+                f"Answer this question about the image clearly and completely: {query.strip()} "
+                "Use only visible evidence. If the answer cannot be determined, say so plainly."
             )
         if context:
-            prompt += f"\nUser-provided context: {context.strip()}"
+            prompt += f" User context: {context.strip()}"
         return prompt

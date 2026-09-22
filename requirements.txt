@@ -1,8 +1,8 @@
 fastapi>=0.115,<1
+mlx-vlm>=0.7,<1
 numpy>=1.24,<3
 opencv-python>=4.8,<5
 Pillow>=10,<13
 python-multipart>=0.0.9,<1
 python-dotenv>=1,<2
-requests>=2.31,<3
 uvicorn[standard]>=0.30,<1

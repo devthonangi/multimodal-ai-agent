@@ -1,11 +1,11 @@
 # Multimodal AI Agent
 
-An image-question-answering app powered by NVIDIA NIM, with a simple browser interface, FastAPI API, live WebSocket video support, lazy initialization, and response caching.
+A free, private image-question-answering app powered by SmolVLM and Apple MLX, with a simple browser interface, FastAPI API, lazy model loading, and response caching.
 
 ## What changed in v2
 
 - The API starts immediately instead of loading multiple large models during import.
-- The default model is NVIDIA Cosmos 3 Nano Reasoner, built for spatial, temporal, causal, and physical-world understanding.
+- The default model is `HuggingFaceTB/SmolVLM-500M-Instruct`, running locally through Apple MLX.
 - Image uploads are validated, size-limited, and processed in memory.
 - Blocking inference runs outside FastAPI's event loop.
 - Repeated image questions use a bounded, thread-safe cache.
@@ -23,13 +23,13 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Create a free NVIDIA API key at [build.nvidia.com](https://build.nvidia.com/nvidia/cosmos3-nano-reasoner), then configure it:
+No account or API key is required. The model downloads from Hugging Face on first use and then runs locally.
+
+Optional configuration:
 
 ```bash
 cp .env.example .env
 ```
-
-Open `.env` and replace `nvapi-your-key-here` with your key. The key stays server-side and is never sent to the browser.
 
 ## Start the API
 
@@ -78,9 +78,7 @@ The server responds with JSON: `{"response": "..."}`.
 
 ## Configuration
 
-- `NVIDIA_API_KEY` authenticates with NVIDIA NIM.
-- `NVIDIA_API_URL` defaults to NVIDIA's hosted NIM endpoint and can point to a self-hosted NIM.
-- `AGENT_MODEL=nvidia/cosmos3-nano-reasoner` selects the Cosmos reasoning model.
+- `AGENT_MODEL=HuggingFaceTB/SmolVLM-500M-Instruct` selects the local model.
 - `MAX_UPLOAD_MB=10` controls the upload limit.
 
 ## Test
@@ -92,7 +90,7 @@ python -m unittest discover -s tests -v
 python -m compileall -q app.py inference utils live tests
 ```
 
-Run a real-image benchmark after the model has been downloaded:
+Run a real-image benchmark after the first model download:
 
 ```bash
 python benchmark.py /path/to/image.jpg 'What is in this image?' --expected dog

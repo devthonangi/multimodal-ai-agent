@@ -10,16 +10,16 @@ from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
-def select_device(requested="nvidia-nim"):
-    return requested or "nvidia-nim"
+def select_device(requested="mlx-metal"):
+    return requested or "mlx-metal"
 
 
 class MultimodalAgent:
     """Lazy-loading, thread-safe image question-answering service."""
 
     def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
-        self.device = select_device(device or "nvidia-nim")
-        self.provider = "nvidia-nim"
+        self.device = select_device(device or "mlx-metal")
+        self.provider = "local-mlx"
         self.model_name = model_name or os.getenv("AGENT_MODEL", DEFAULT_MODEL)
         self.cache = CacheManager(cache_size)
         self._reasoner_factory = reasoner_factory
@@ -69,6 +69,6 @@ class MultimodalAgent:
             "device": self.device,
             "provider": self.provider,
             "model": self.model_name,
-            "configured": bool(os.getenv("NVIDIA_API_KEY")),
+            "configured": True,
             "cached_responses": len(self.cache),
         }
