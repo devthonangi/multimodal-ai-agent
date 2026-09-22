@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Ask simple questions about any image using a local AI model.">
+  <meta name="description" content="Ask detailed questions about any image using NVIDIA Nemotron.">
   <title>Image Chat</title>
   <style>
     :root {
@@ -178,9 +178,9 @@
 </head>
 <body>
   <main>
-    <p class="eyebrow">Local AI vision</p>
+    <p class="eyebrow">NVIDIA AI vision</p>
     <h1>Ask your image.</h1>
-    <p class="intro">Choose a picture, ask one clear question, and get a simple answer. Your image is processed locally by the running AI service.</p>
+    <p class="intro">Choose a picture and ask a question. NVIDIA Nemotron analyzes details, text, objects, and context to provide a grounded answer.</p>
 
     <form id="query-form">
       <label class="drop-zone" id="drop-zone" for="image">
@@ -272,7 +272,7 @@
         result.innerHTML = '<span class="answer-label">Answer</span>';
         result.append(document.createTextNode(payload.response));
         result.className = 'visible';
-        status.textContent = `Answered locally with ${payload.model} on ${payload.device}.`;
+        status.textContent = `Answered with ${payload.model}.`;
       } catch (error) {
         result.textContent = error.message;
         result.className = 'visible error';

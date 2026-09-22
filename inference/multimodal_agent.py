@@ -4,28 +4,22 @@ import os
 from pathlib import Path
 from threading import RLock
 
-import torch
 from PIL import Image
 
 from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
-def select_device(requested="auto"):
-    if requested and requested != "auto":
-        return requested
-    if torch.cuda.is_available():
-        return "cuda"
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+def select_device(requested="nvidia-nim"):
+    return requested or "nvidia-nim"
 
 
 class MultimodalAgent:
     """Lazy-loading, thread-safe image question-answering service."""
 
     def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
-        self.device = select_device(device or os.getenv("AGENT_DEVICE", "auto"))
+        self.device = select_device(device or "nvidia-nim")
+        self.provider = "nvidia-nim"
         self.model_name = model_name or os.getenv("AGENT_MODEL", DEFAULT_MODEL)
         self.cache = CacheManager(cache_size)
         self._reasoner_factory = reasoner_factory
@@ -58,7 +52,7 @@ class MultimodalAgent:
             raise ValueError("Question cannot be empty")
         image = image.convert("RGB")
         digest = hashlib.sha256(image.tobytes()).hexdigest()
-        key = (digest, query, context or "", self.model_name)
+        key = (digest, query, context or "", self.provider, self.model_name)
         cached = self.cache.get(key)
         if cached is not None:
             return cached
@@ -73,6 +67,8 @@ class MultimodalAgent:
         return {
             "loaded": self.is_loaded,
             "device": self.device,
+            "provider": self.provider,
             "model": self.model_name,
+            "configured": bool(os.getenv("NVIDIA_API_KEY")),
             "cached_responses": len(self.cache),
         }

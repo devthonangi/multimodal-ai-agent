@@ -1,11 +1,11 @@
 # Multimodal AI Agent
 
-A local image-question-answering service with a FastAPI API, live WebSocket video support, lazy model loading, response caching, and CPU, Apple Silicon, or CUDA execution.
+An image-question-answering app powered by NVIDIA NIM, with a simple browser interface, FastAPI API, live WebSocket video support, lazy initialization, and response caching.
 
 ## What changed in v2
 
 - The API starts immediately instead of loading multiple large models during import.
-- The default model is the practical `Salesforce/blip-vqa-base` rather than BLIP-2 FLAN-T5-XL.
+- The default model is NVIDIA Nemotron 3 Nano Omni 30B A3B Reasoning, producing detailed multimodal answers instead of one-word labels.
 - Image uploads are validated, size-limited, and processed in memory.
 - Blocking inference runs outside FastAPI's event loop.
 - Repeated image questions use a bounded, thread-safe cache.
@@ -23,7 +23,13 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Models are downloaded from Hugging Face on first use.
+Create a free NVIDIA API key at [build.nvidia.com](https://build.nvidia.com/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning), then configure it:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and replace `nvapi-your-key-here` with your key. The key stays server-side and is never sent to the browser.
 
 ## Start the API
 
@@ -72,15 +78,10 @@ The server responds with JSON: `{"response": "..."}`.
 
 ## Configuration
 
-- `AGENT_DEVICE=auto|cpu|mps|cuda` selects the inference device.
-- `AGENT_MODEL=Salesforce/blip-vqa-base` selects a compatible BLIP VQA model.
+- `NVIDIA_API_KEY` authenticates with NVIDIA NIM.
+- `NVIDIA_API_URL` defaults to NVIDIA's hosted NIM endpoint and can point to a self-hosted NIM.
+- `AGENT_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` selects the NVIDIA model.
 - `MAX_UPLOAD_MB=10` controls the upload limit.
-
-Example for Apple Silicon:
-
-```bash
-AGENT_DEVICE=mps uvicorn app:app
-```
 
 ## Test
 

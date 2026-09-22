@@ -6,7 +6,10 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, W
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
+from dotenv import load_dotenv
 from pydantic import BaseModel
+
+load_dotenv()
 
 from inference.multimodal_agent import MultimodalAgent
 

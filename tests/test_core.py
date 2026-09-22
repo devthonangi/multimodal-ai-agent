@@ -1,10 +1,13 @@
 import io
+import os
 import unittest
+from unittest.mock import Mock, patch
 
 from PIL import Image
 
 from app import validate_image
 from inference.multimodal_agent import MultimodalAgent
+from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
@@ -65,6 +68,28 @@ class UploadTests(unittest.TestCase):
         validate_image(image_bytes())
         with self.assertRaisesRegex(ValueError, "valid image"):
             validate_image(b"not an image")
+
+
+class NvidiaReasonerTests(unittest.TestCase):
+    def test_nvidia_payload_and_detailed_prompt(self):
+        response = Mock()
+        response.ok = True
+        response.json.return_value = {"choices": [{"message": {"content": "A detailed answer."}}]}
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "test-key"}), patch(
+            "inference.text_reasoner.requests.post", return_value=response
+        ) as post:
+            reasoner = TextReasoner("nvidia-nim", DEFAULT_MODEL)
+            answer = reasoner.generate("What is in this image?", None, Image.new("RGB", (8, 6), "red"))
+
+        self.assertEqual(answer, "A detailed answer.")
+        request = post.call_args.kwargs
+        self.assertEqual(request["json"]["model"], DEFAULT_MODEL)
+        self.assertIn("2 to 4 complete sentences", request["json"]["messages"][0]["content"][0]["text"])
+        self.assertTrue(
+            request["json"]["messages"][0]["content"][1]["image_url"]["url"].startswith(
+                "data:image/jpeg;base64,"
+            )
+        )
 
 
 if __name__ == "__main__":
