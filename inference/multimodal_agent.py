@@ -1,27 +1,78 @@
+import hashlib
+import io
+import os
+from pathlib import Path
+from threading import RLock
+
 import torch
-from inference.vision_encoder import VisionEncoder
-from inference.text_reasoner import TextReasoner
-from utils.rag_utils import RAGRetriever
+from PIL import Image
+
+from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
+
+def select_device(requested="auto"):
+    if requested and requested != "auto":
+        return requested
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 class MultimodalAgent:
-    def __init__(self, device="cuda" if torch.cuda.is_available() else "cpu"):
-        print(f"[INFO] Initializing Multimodal Agent on {device}")
-        self.device = device
-        self.vision_encoder = VisionEncoder(device)
-        self.text_reasoner = TextReasoner(device)
-        self.retriever = RAGRetriever(device)
-        self.cache = CacheManager()
+    """Lazy-loading, thread-safe image question-answering service."""
 
-    def process_query(self, image_path, query):
-        # Step 1: Compute or retrieve cached visual embedding
-        vision_features = self.cache.get_or_compute(
-            image_path, lambda: self.vision_encoder.encode(image_path)
-        )
+    def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
+        self.device = select_device(device or os.getenv("AGENT_DEVICE", "auto"))
+        self.model_name = model_name or os.getenv("AGENT_MODEL", DEFAULT_MODEL)
+        self.cache = CacheManager(cache_size)
+        self._reasoner_factory = reasoner_factory
+        self._reasoner = None
+        self._load_lock = RLock()
+        self._inference_lock = RLock()
 
-        # Step 2: Retrieve relevant textual context
-        context = self.retriever.retrieve(vision_features, query)
+    @property
+    def is_loaded(self):
+        return self._reasoner is not None
 
-        # Step 3: Generate multimodal response
-        response = self.text_reasoner.generate(query, context, vision_features)
-        return response
+    def load(self):
+        if self._reasoner is None:
+            with self._load_lock:
+                if self._reasoner is None:
+                    self._reasoner = self._reasoner_factory(self.device, self.model_name)
+        return self
+
+    def process_query(self, image_path, query, context=None):
+        with Image.open(Path(image_path)) as image:
+            return self.process_image(image.convert("RGB"), query, context)
+
+    def process_bytes(self, image_bytes, query, context=None):
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            return self.process_image(image.convert("RGB"), query, context)
+
+    def process_image(self, image, query, context=None):
+        query = query.strip()
+        if not query:
+            raise ValueError("Question cannot be empty")
+        image = image.convert("RGB")
+        digest = hashlib.sha256(image.tobytes()).hexdigest()
+        key = (digest, query, context or "", self.model_name)
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+
+        self.load()
+        with self._inference_lock:
+            answer = self._reasoner.generate(query, context, image)
+        self.cache.put(key, answer)
+        return answer
+
+    def status(self):
+        return {
+            "loaded": self.is_loaded,
+            "device": self.device,
+            "model": self.model_name,
+            "cached_responses": len(self.cache),
+        }

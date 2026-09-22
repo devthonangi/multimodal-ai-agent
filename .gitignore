@@ -1,5 +1,6 @@
 # Virtual env & build
 venv/
+.venv/
 .env
 __pycache__/
 *.pyc
@@ -18,4 +19,8 @@ dist/
 # Logs & misc
 *.log
 *.pth
+temp_*.jpg
+temp_frame.jpg
+frame.jpg
+benchmark_results.csv
 .ipynb_checkpoints/
