@@ -31,7 +31,7 @@ Models are downloaded from Hugging Face on first use.
 uvicorn app:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the interactive API.
+Open `http://127.0.0.1:8000` for the simple image-question interface. Developer API documentation remains available at `http://127.0.0.1:8000/docs`.
 
 The server starts without loading the model. Either send the first query or preload it:
 

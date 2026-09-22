@@ -1,8 +1,10 @@
 import io
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
@@ -11,6 +13,7 @@ from inference.multimodal_agent import MultimodalAgent
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 app = FastAPI(
     title="Multimodal AI Agent",
@@ -40,7 +43,7 @@ def validate_image(data):
 
 @app.get("/")
 async def root():
-    return {"name": app.title, "docs": "/docs", "health": "/health"}
+    return FileResponse(WEB_INDEX)
 
 
 @app.get("/health")
