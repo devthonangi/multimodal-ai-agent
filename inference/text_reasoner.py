@@ -5,7 +5,7 @@ import os
 import requests
 
 
-DEFAULT_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+DEFAULT_MODEL = "nvidia/cosmos3-nano-reasoner"
 DEFAULT_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 
@@ -46,10 +46,8 @@ class TextReasoner:
                         ],
                     }
                 ],
-                "max_tokens": 1024,
+                "max_tokens": 4096,
                 "temperature": 0.2,
-                "top_k": 1,
-                "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=120,
         )
@@ -82,15 +80,16 @@ class TextReasoner:
             "describe the image",
         }:
             prompt = (
-                "Describe this image accurately in 2 to 4 complete sentences. Identify the main subjects, "
-                "setting, actions, visible text, spatial relationships, and notable details. Do not guess "
-                "about anything that is not visually supported."
+                "Analyze this scene using physical-world reasoning. In 2 to 4 complete sentences, identify "
+                "the main subjects, setting, actions, object states, spatial relationships, visible text, "
+                "and notable details. Separate direct observations from uncertain inferences and do not guess."
             )
         else:
             prompt = (
                 f"Answer this question about the image: {query.strip()}\n"
-                "Give a clear, complete answer grounded only in visible evidence. Explain briefly when useful. "
-                "If the answer cannot be determined from the image, say so plainly."
+                "Give a clear answer grounded in visible evidence and physical-world reasoning. Consider object "
+                "states, space, motion, causality, and likely next events only when relevant. Separate observations "
+                "from inferences. If the answer cannot be determined, say so plainly."
             )
         if context:
             prompt += f"\nUser-provided context: {context.strip()}"

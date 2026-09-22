@@ -5,7 +5,7 @@ An image-question-answering app powered by NVIDIA NIM, with a simple browser int
 ## What changed in v2
 
 - The API starts immediately instead of loading multiple large models during import.
-- The default model is NVIDIA Nemotron 3 Nano Omni 30B A3B Reasoning, producing detailed multimodal answers instead of one-word labels.
+- The default model is NVIDIA Cosmos 3 Nano Reasoner, built for spatial, temporal, causal, and physical-world understanding.
 - Image uploads are validated, size-limited, and processed in memory.
 - Blocking inference runs outside FastAPI's event loop.
 - Repeated image questions use a bounded, thread-safe cache.
@@ -23,7 +23,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Create a free NVIDIA API key at [build.nvidia.com](https://build.nvidia.com/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning), then configure it:
+Create a free NVIDIA API key at [build.nvidia.com](https://build.nvidia.com/nvidia/cosmos3-nano-reasoner), then configure it:
 
 ```bash
 cp .env.example .env
@@ -80,7 +80,7 @@ The server responds with JSON: `{"response": "..."}`.
 
 - `NVIDIA_API_KEY` authenticates with NVIDIA NIM.
 - `NVIDIA_API_URL` defaults to NVIDIA's hosted NIM endpoint and can point to a self-hosted NIM.
-- `AGENT_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` selects the NVIDIA model.
+- `AGENT_MODEL=nvidia/cosmos3-nano-reasoner` selects the Cosmos reasoning model.
 - `MAX_UPLOAD_MB=10` controls the upload limit.
 
 ## Test
