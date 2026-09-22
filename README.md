@@ -2,7 +2,16 @@
 
 A free, private image-question-answering app powered by SmolVLM and Apple MLX, with a simple browser interface, FastAPI API, lazy model loading, and response caching.
 
-The browser interface keeps one image as visual context, supports multi-turn follow-up questions, and includes one-click OCR for visible text.
+The browser interface is intentionally focused: select one image, enter one clear question, and receive one answer. It does not show an image preview, retain chat history, or include a separate OCR workflow.
+
+## Browser workflow
+
+1. Open the local web app.
+2. Select or drop a JPEG, PNG, or WebP image.
+3. Enter a question about that image.
+4. Select **Ask AI** to see the answer.
+
+Choosing another file starts a new, independent question. The browser does not send previous answers as conversation context.
 
 ## What changed in v2
 
