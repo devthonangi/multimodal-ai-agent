@@ -5,7 +5,7 @@ from utils.rag_utils import RetrievalEngine
 
 DEFAULT_MODEL = "llava-hf/llava-1.5-7b-hf"
 DEFAULT_CAPTION_MODEL = "Salesforce/blip2-opt-2.7b"
-DEFAULT_FALLBACK_MODEL = "HuggingFaceTB/SmolVLM-500M-Instruct"
+DEFAULT_FALLBACK_MODEL = "Salesforce/blip-vqa-base"
 
 
 class TextReasoner:
@@ -23,16 +23,24 @@ class TextReasoner:
         self.lightweight = model_name == DEFAULT_FALLBACK_MODEL
 
         if self.lightweight:
-            try:
-                from transformers import AutoModelForImageTextToText as AutoVisionModel
-            except ImportError:
-                from transformers import AutoModelForVision2Seq as AutoVisionModel
+            from transformers import BlipForQuestionAnswering, BlipProcessor
 
             print(f"[model] Loading lightweight {model_name} on {device}")
-            self.processor = AutoProcessor.from_pretrained(model_name)
-            self.model = AutoVisionModel.from_pretrained(
-                model_name, torch_dtype=self.dtype, low_cpu_mem_usage=True
-            ).to(device)
+            try:
+                self.processor = BlipProcessor.from_pretrained(
+                    model_name, local_files_only=True
+                )
+                self.model = BlipForQuestionAnswering.from_pretrained(
+                    model_name,
+                    torch_dtype=self.dtype,
+                    low_cpu_mem_usage=True,
+                    local_files_only=True,
+                ).to(device)
+            except OSError:
+                self.processor = BlipProcessor.from_pretrained(model_name)
+                self.model = BlipForQuestionAnswering.from_pretrained(
+                    model_name, torch_dtype=self.dtype, low_cpu_mem_usage=True
+                ).to(device)
             self.model.eval()
             return
 
@@ -70,39 +78,55 @@ class TextReasoner:
         return answer or caption
 
     def _generate_lightweight(self, query, context, image):
-        instruction = (
-            "Answer the question using only visible evidence in the image. "
-            "This is an image-only conversation. If the request is unrelated to the selected image "
-            "or its conversation history, politely say you can only help with that image. "
-            "Respond naturally, like a helpful person having a conversation. "
-            "Answer directly in one or two complete sentences. Do not reply with another question "
-            "unless clarification is truly necessary. Keep it concise and say when something "
-            "cannot be determined.\n"
-        )
-        if context and context.strip():
-            instruction += (
-                "Conversation history for this image:\n"
-                f"{context.strip()}\n"
-                "Use that history to understand follow-up questions and keep your answer consistent.\n"
+        normalized = query.lower().strip(" .,!?;:")
+        previous_answer = self._last_history_value(context, "Assistant")
+
+        if len(normalized) <= 3 and normalized not in {"who", "why"}:
+            return "I didn’t understand that. Please ask a clear question about the image."
+        if normalized in {"u asking me", "you asking me", "who are you", "how are you"}:
+            return "I can only help with questions about the selected image."
+        if any(term in normalized for term in ("thinking", "thought", "mind", "feeling inside")):
+            return (
+                "I can’t determine what someone is thinking from an image. "
+                "I can only describe their visible expression, pose, and surroundings."
             )
-        instruction += f"Question: {query.strip()}"
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": instruction},
-                ],
-            }
-        ]
-        prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-        inputs = self._move_inputs(
-            self.processor(text=prompt, images=[image], return_tensors="pt")
-        )
+        if previous_answer and normalized in {"what", "what do you mean", "explain", "explain that"}:
+            return f"To clarify, {previous_answer[0].lower() + previous_answer[1:]}"
+        if previous_answer and ("are you sure" in normalized or normalized == "why"):
+            return (
+                f"Based on the visible details, my previous answer was: {previous_answer} "
+                "I can’t be certain about anything that is not directly shown."
+            )
+
+        inputs = self._move_inputs(self.processor(images=image, text=query, return_tensors="pt"))
         with self.torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=160, do_sample=False)
-        generated = output[:, inputs["input_ids"].shape[1] :]
-        return self.processor.batch_decode(generated, skip_special_tokens=True)[0].strip()
+            output = self.model.generate(**inputs, max_new_tokens=30, do_sample=False)
+        raw_answer = self.processor.decode(output[0], skip_special_tokens=True).strip()
+        return self._conversational_answer(query, raw_answer)
+
+    @staticmethod
+    def _last_history_value(context, role):
+        if not context:
+            return ""
+        prefix = f"{role}: "
+        values = [line[len(prefix) :].strip() for line in context.splitlines() if line.startswith(prefix)]
+        return values[-1] if values else ""
+
+    @staticmethod
+    def _conversational_answer(query, answer):
+        answer = answer.strip().rstrip(".")
+        if not answer:
+            return "I can’t determine that from this image."
+        normalized = query.lower()
+        if "doing" in normalized:
+            return f"The person appears to be {answer}."
+        if "wearing" in normalized:
+            return f"The person is wearing {answer}."
+        if any(phrase in normalized for phrase in ("what is in", "what's in", "whats in", "what do you see")):
+            if answer.lower() in {"man", "woman", "boy", "girl", "person", "dog", "cat"}:
+                answer = f"a {answer}"
+            return f"The image shows {answer}."
+        return answer[0].upper() + answer[1:] + "."
 
     def _caption(self, image):
         inputs = self._move_inputs(self.caption_processor(images=image, return_tensors="pt"))

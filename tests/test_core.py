@@ -96,6 +96,18 @@ class LocalReasonerTests(unittest.TestCase):
         agent = MultimodalAgent(device="cpu", reasoner_factory=FakeReasoner)
         self.assertEqual(agent.model_name, DEFAULT_FALLBACK_MODEL)
 
+    def test_lightweight_answers_are_conversational(self):
+        answer = TextReasoner._conversational_answer(
+            "What is the person doing?", "covering his face"
+        )
+        self.assertEqual(answer, "The person appears to be covering his face.")
+
+    def test_history_value_uses_latest_answer(self):
+        context = "User: What is shown?\nAssistant: A man.\nUser: What is he doing?\nAssistant: Covering his face."
+        self.assertEqual(
+            TextReasoner._last_history_value(context, "Assistant"), "Covering his face."
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
