@@ -116,17 +116,20 @@
 
     .status { min-height: 18px; margin: 11px 2px 0; color: var(--muted); font-size: 12px; text-align: center; }
 
-    .answer {
+    .conversation {
       display: none;
       margin-top: 26px;
       padding: 20px;
       border-radius: 14px;
       background: var(--soft);
     }
-    .answer.visible { display: block; }
-    .answer.error { color: var(--error); background: #fff3f2; }
-    .answer h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-    .answer p { margin: 0; line-height: 1.6; white-space: pre-wrap; }
+    .conversation.visible { display: block; }
+    .conversation h2 { margin: 0 0 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .messages { display: grid; gap: 10px; }
+    .message { width: fit-content; max-width: 88%; padding: 10px 13px; border-radius: 12px; line-height: 1.5; white-space: pre-wrap; }
+    .message.user { justify-self: end; color: white; background: var(--accent); border-bottom-right-radius: 4px; }
+    .message.assistant { justify-self: start; background: white; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    .message.error { color: var(--error); background: #fff3f2; border-color: #f3c7c3; }
 
     @media (max-width: 480px) {
       body { padding: 12px; align-items: start; }
@@ -167,9 +170,9 @@
       <div class="status" id="status" role="status"></div>
     </form>
 
-    <section class="answer" id="answer" aria-live="polite">
-      <h2>Answer</h2>
-      <p id="answer-text"></p>
+    <section class="conversation" id="conversation" aria-live="polite">
+      <h2>Conversation</h2>
+      <div class="messages" id="messages"></div>
     </section>
   </main>
 
@@ -182,8 +185,8 @@
     const question = document.querySelector('#question');
     const askButton = document.querySelector('#ask-button');
     const status = document.querySelector('#status');
-    const answer = document.querySelector('#answer');
-    const answerText = document.querySelector('#answer-text');
+    const conversation = document.querySelector('#conversation');
+    const messages = document.querySelector('#messages');
     let conversationHistory = [];
     const closingMessages = new Set([
       'ok', 'okay', 'got it', 'understood', 'thanks', 'thank you',
@@ -194,13 +197,42 @@
       return value.toLowerCase().trim().replace(/[.!?,;:]+$/g, '');
     }
 
+    function renderConversation(pendingQuestion = '', errorMessage = '') {
+      messages.replaceChildren();
+      const visibleTurns = [...conversationHistory];
+      if (pendingQuestion) visibleTurns.push({ question: pendingQuestion, answer: '' });
+
+      for (const turn of visibleTurns) {
+        const userMessage = document.createElement('div');
+        userMessage.className = 'message user';
+        userMessage.textContent = turn.question;
+        messages.appendChild(userMessage);
+
+        if (turn.answer) {
+          const assistantMessage = document.createElement('div');
+          assistantMessage.className = 'message assistant';
+          assistantMessage.textContent = turn.answer;
+          messages.appendChild(assistantMessage);
+        }
+      }
+
+      if (errorMessage) {
+        const error = document.createElement('div');
+        error.className = 'message assistant error';
+        error.textContent = errorMessage;
+        messages.appendChild(error);
+      }
+      conversation.className = visibleTurns.length || errorMessage
+        ? 'conversation visible'
+        : 'conversation';
+    }
+
     function selectFile(file) {
       if (!file) return;
       fileName.textContent = file.name;
       fileHelp.textContent = 'Selected · click to change';
-      answer.className = 'answer';
-      answerText.textContent = '';
       conversationHistory = [];
+      renderConversation();
       question.focus();
     }
 
@@ -235,8 +267,7 @@
 
       if (conversationHistory.length && closingMessages.has(normalizedMessage(prompt))) {
         conversationHistory = [];
-        answerText.textContent = 'You’re welcome. This image conversation has been cleared.';
-        answer.className = 'answer visible';
+        renderConversation();
         status.textContent = 'Conversation cleared.';
         question.value = '';
         question.placeholder = 'Ask a new question about this image…';
@@ -246,7 +277,7 @@
       askButton.disabled = true;
       askButton.textContent = 'Analyzing…';
       status.textContent = 'The multimodal agent is reasoning over your image.';
-      answer.className = 'answer';
+      renderConversation(prompt);
 
       const data = new FormData();
       data.append('image', file);
@@ -264,15 +295,13 @@
         const response = await fetch('/query', { method: 'POST', body: data });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this image.');
-        answerText.textContent = payload.response;
         conversationHistory.push({ question: prompt, answer: payload.response });
-        answer.className = 'answer visible';
+        renderConversation();
         status.textContent = 'Answered privately on this device.';
         question.value = '';
         question.placeholder = 'Ask a follow-up about this image…';
       } catch (error) {
-        answerText.textContent = error.message;
-        answer.className = 'answer visible error';
+        renderConversation(prompt, error.message);
         status.textContent = 'Please try again.';
       } finally {
         askButton.disabled = false;
