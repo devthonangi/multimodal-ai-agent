@@ -78,12 +78,19 @@ class LocalReasonerTests(unittest.TestCase):
     def test_model_and_detailed_prompt(self):
         self.assertEqual(DEFAULT_MODEL, "llava-hf/llava-1.5-7b-hf")
         prompt = TextReasoner._build_prompt(
-            "What is in this image?", "A red car", "A red car on a road"
+            "Are you sure? Why?",
+            "A red car",
+            "A red car on a road",
+            "User: What color is the car?\nAssistant: The car is red.",
         )
         self.assertIn("Retrieved evidence", prompt)
         self.assertIn("do not invent details", prompt)
         self.assertIn("natural and conversational", prompt)
         self.assertIn("Answer directly", prompt)
+        self.assertIn("The car is red", prompt)
+        self.assertIn("resolve follow-up questions", prompt)
+        self.assertIn("image-only conversation", prompt)
+        self.assertIn("unrelated", prompt)
 
     def test_cpu_uses_lightweight_fallback(self):
         agent = MultimodalAgent(device="cpu", reasoner_factory=FakeReasoner)

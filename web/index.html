@@ -142,7 +142,7 @@
         <h1>Ask an image</h1>
         <span class="local">Vision + retrieval</span>
       </div>
-      <p>Choose an image and ask one clear question.</p>
+      <p>Choose an image, ask a question, and continue with natural follow-ups.</p>
     </header>
 
     <form id="query-form">
@@ -184,6 +184,15 @@
     const status = document.querySelector('#status');
     const answer = document.querySelector('#answer');
     const answerText = document.querySelector('#answer-text');
+    let conversationHistory = [];
+    const closingMessages = new Set([
+      'ok', 'okay', 'got it', 'understood', 'thanks', 'thank you',
+      'that answers it', 'that is all', "that's all", 'done'
+    ]);
+
+    function normalizedMessage(value) {
+      return value.toLowerCase().trim().replace(/[.!?,;:]+$/g, '');
+    }
 
     function selectFile(file) {
       if (!file) return;
@@ -191,6 +200,7 @@
       fileHelp.textContent = 'Selected · click to change';
       answer.className = 'answer';
       answerText.textContent = '';
+      conversationHistory = [];
       question.focus();
     }
 
@@ -223,6 +233,16 @@
       const prompt = question.value.trim();
       if (!file || !prompt || askButton.disabled) return;
 
+      if (conversationHistory.length && closingMessages.has(normalizedMessage(prompt))) {
+        conversationHistory = [];
+        answerText.textContent = 'You’re welcome. This image conversation has been cleared.';
+        answer.className = 'answer visible';
+        status.textContent = 'Conversation cleared.';
+        question.value = '';
+        question.placeholder = 'Ask a new question about this image…';
+        return;
+      }
+
       askButton.disabled = true;
       askButton.textContent = 'Analyzing…';
       status.textContent = 'The multimodal agent is reasoning over your image.';
@@ -231,14 +251,25 @@
       const data = new FormData();
       data.append('image', file);
       data.append('question', prompt);
+      if (conversationHistory.length) {
+        const context = conversationHistory
+          .slice(-6)
+          .map(turn => `User: ${turn.question}\nAssistant: ${turn.answer}`)
+          .join('\n')
+          .slice(-7000);
+        data.append('context', context);
+      }
 
       try {
         const response = await fetch('/query', { method: 'POST', body: data });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || 'Unable to analyze this image.');
         answerText.textContent = payload.response;
+        conversationHistory.push({ question: prompt, answer: payload.response });
         answer.className = 'answer visible';
         status.textContent = 'Answered privately on this device.';
+        question.value = '';
+        question.placeholder = 'Ask a follow-up about this image…';
       } catch (error) {
         answerText.textContent = error.message;
         answer.className = 'answer visible error';

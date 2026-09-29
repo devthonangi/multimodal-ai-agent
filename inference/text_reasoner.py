@@ -60,7 +60,7 @@ class TextReasoner:
         if context and context.strip():
             sources.append(context.strip())
         evidence = self.retrieval.retrieve(query, sources)
-        prompt = self._build_prompt(query, caption, evidence)
+        prompt = self._build_prompt(query, caption, evidence, context or "")
 
         inputs = self._move_inputs(self.processor(images=image, text=prompt, return_tensors="pt"))
         with self.torch.inference_mode():
@@ -72,13 +72,19 @@ class TextReasoner:
     def _generate_lightweight(self, query, context, image):
         instruction = (
             "Answer the question using only visible evidence in the image. "
+            "This is an image-only conversation. If the request is unrelated to the selected image "
+            "or its conversation history, politely say you can only help with that image. "
             "Respond naturally, like a helpful person having a conversation. "
             "Answer directly in one or two complete sentences. Do not reply with another question "
             "unless clarification is truly necessary. Keep it concise and say when something "
             "cannot be determined.\n"
         )
         if context and context.strip():
-            instruction += f"Additional context: {context.strip()}\n"
+            instruction += (
+                "Conversation history for this image:\n"
+                f"{context.strip()}\n"
+                "Use that history to understand follow-up questions and keep your answer consistent.\n"
+            )
         instruction += f"Question: {query.strip()}"
         messages = [
             {
@@ -111,15 +117,19 @@ class TextReasoner:
         }
 
     @staticmethod
-    def _build_prompt(query, caption="", retrieved=""):
+    def _build_prompt(query, caption="", retrieved="", history=""):
         return (
             "USER: <image>\n"
             "Answer using the image and the retrieved evidence. "
+            "This is an image-only conversation. If the request is unrelated to the selected image "
+            "or its conversation history, politely redirect the user to ask about the image. "
             "Sound natural and conversational. Answer directly in one or two complete sentences, "
             "and do not respond with an unrelated follow-up question. Be specific and do not "
             "invent details.\n"
             f"Visual extraction: {caption or 'No caption available.'}\n"
             f"Retrieved evidence: {retrieved or 'No additional evidence.'}\n"
+            f"Conversation history: {history or 'No previous turns.'}\n"
+            "Use the conversation history to resolve follow-up questions and remain consistent.\n"
             f"Question: {query.strip()}\n"
             "ASSISTANT:"
         )
