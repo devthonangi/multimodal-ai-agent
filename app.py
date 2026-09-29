@@ -2,7 +2,7 @@ import io
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
@@ -20,7 +20,7 @@ WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 app = FastAPI(
     title="Multimodal AI Agent",
-    description="LLaVA and BLIP-2 image reasoning with FAISS retrieval over HTTP and WebSocket.",
+    description="Local conversational image question answering over HTTP.",
     version="3.0.0",
 )
 agent = MultimodalAgent()
@@ -80,22 +80,3 @@ async def query_image(
     except Exception as error:
         raise HTTPException(status_code=503, detail=f"Inference failed: {error}") from error
     return QueryResponse(response=answer, model=agent.model_name, device=agent.device)
-
-
-@app.websocket("/ws/video")
-async def video_stream(websocket: WebSocket):
-    await websocket.accept()
-    question = websocket.query_params.get("question", "What is happening in this scene?")
-    try:
-        while True:
-            data = await websocket.receive_bytes()
-            try:
-                validate_image(data)
-                answer = await run_in_threadpool(agent.process_bytes, data, question, None)
-                await websocket.send_json({"response": answer})
-            except (ValueError, UnidentifiedImageError) as error:
-                await websocket.send_json({"error": str(error)})
-            except Exception as error:
-                await websocket.send_json({"error": f"Inference failed: {error}"})
-    except WebSocketDisconnect:
-        return

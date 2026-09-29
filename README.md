@@ -20,7 +20,7 @@ Image + question + recent history
         Browser conversation
 ```
 
-- FastAPI validates the image and handles HTTP or WebSocket requests.
+- FastAPI validates the image and handles HTTP requests.
 - The agent selects a model backend based on the available hardware.
 - Recent turns remain scoped to the selected image for follow-up questions.
 - FAISS supports retrieval on the CUDA pipeline; all backends use response caching.
