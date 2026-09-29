@@ -2,6 +2,29 @@
 
 Local image question answering with conversational follow-ups.
 
+## High-level view
+
+```text
+Image + question + recent history
+                |
+             FastAPI
+                |
+        Hardware detection
+          /      |      \
+      CUDA      MLX     CPU
+   LLaVA +    Qwen2.5   BLIP
+    BLIP-2       VL      VQA
+          \      |      /
+       Grounded response
+                |
+        Browser conversation
+```
+
+- FastAPI validates the image and handles HTTP or WebSocket requests.
+- The agent selects a model backend based on the available hardware.
+- Recent turns remain scoped to the selected image for follow-up questions.
+- FAISS supports retrieval on the CUDA pipeline; all backends use response caching.
+
 ## Models
 
 - NVIDIA CUDA: LLaVA + BLIP-2
