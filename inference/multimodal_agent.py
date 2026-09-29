@@ -10,16 +10,28 @@ from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
-def select_device(requested="mlx-metal"):
-    return requested or "mlx-metal"
+def select_device(requested="auto"):
+    requested = requested or "auto"
+    if requested != "auto":
+        return requested
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    except (ImportError, AttributeError):
+        pass
+    return "cpu"
 
 
 class MultimodalAgent:
     """Lazy-loading, thread-safe image question-answering service."""
 
     def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
-        self.device = select_device(device or "mlx-metal")
-        self.provider = "local-mlx"
+        self.device = select_device(device or os.getenv("AGENT_DEVICE", "auto"))
+        self.provider = "pytorch-transformers"
         self.model_name = model_name or os.getenv("AGENT_MODEL", DEFAULT_MODEL)
         self.cache = CacheManager(cache_size)
         self._reasoner_factory = reasoner_factory

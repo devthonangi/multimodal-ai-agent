@@ -20,8 +20,8 @@ WEB_INDEX = Path(__file__).resolve().parent / "web" / "index.html"
 
 app = FastAPI(
     title="Multimodal AI Agent",
-    description="Local image question answering over HTTP and WebSocket.",
-    version="2.0.0",
+    description="LLaVA and BLIP-2 image reasoning with FAISS retrieval over HTTP and WebSocket.",
+    version="3.0.0",
 )
 agent = MultimodalAgent()
 

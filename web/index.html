@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Ask one question about an image with a private local AI model.">
-  <title>Local Vision</title>
+  <meta name="description" content="Ask one question about an image with a multimodal vision-language pipeline.">
+  <title>Multimodal Vision Agent</title>
   <style>
     :root {
       color-scheme: light;
@@ -140,7 +140,7 @@
     <header class="header">
       <div class="header-row">
         <h1>Ask an image</h1>
-        <span class="local">Runs locally</span>
+        <span class="local">Vision + retrieval</span>
       </div>
       <p>Choose an image and ask one clear question.</p>
     </header>
@@ -225,7 +225,7 @@
 
       askButton.disabled = true;
       askButton.textContent = 'Analyzing…';
-      status.textContent = 'The local model is looking at your image.';
+      status.textContent = 'The multimodal agent is reasoning over your image.';
       answer.className = 'answer';
 
       const data = new FormData();

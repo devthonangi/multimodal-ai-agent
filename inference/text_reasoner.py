@@ -1,64 +1,75 @@
-import tempfile
-from pathlib import Path
+import os
 
-from mlx_vlm import generate, load
-from mlx_vlm.prompt_utils import apply_chat_template
-from mlx_vlm.utils import load_config
+from utils.rag_utils import RetrievalEngine
 
 
-DEFAULT_MODEL = "HuggingFaceTB/SmolVLM-500M-Instruct"
+DEFAULT_MODEL = "llava-hf/llava-1.5-7b-hf"
+DEFAULT_CAPTION_MODEL = "Salesforce/blip2-opt-2.7b"
 
 
 class TextReasoner:
-    """Free local vision-language reasoning accelerated by Apple MLX."""
+    """BLIP-2 visual extraction, FAISS retrieval, and LLaVA reasoning."""
 
     def __init__(self, device, model_name=DEFAULT_MODEL):
-        self.device = "mlx-metal"
+        import torch
+        from transformers import AutoProcessor, Blip2ForConditionalGeneration, LlavaForConditionalGeneration
+
+        self.device = device
         self.model_name = model_name
-        print(f"[model] Loading {model_name} with MLX")
-        self.model, self.processor = load(model_name)
-        self.config = load_config(model_name)
+        self.caption_model_name = os.getenv("CAPTION_MODEL", DEFAULT_CAPTION_MODEL)
+        self.torch = torch
+        self.dtype = torch.float16 if device == "cuda" else torch.float32
+
+        print(f"[model] Loading {self.caption_model_name} on {device}")
+        self.caption_processor = AutoProcessor.from_pretrained(self.caption_model_name)
+        self.caption_model = Blip2ForConditionalGeneration.from_pretrained(
+            self.caption_model_name, torch_dtype=self.dtype
+        ).to(device)
+        self.caption_model.eval()
+
+        print(f"[model] Loading {model_name} on {device}")
+        self.processor = AutoProcessor.from_pretrained(model_name)
+        self.model = LlavaForConditionalGeneration.from_pretrained(
+            model_name, torch_dtype=self.dtype, low_cpu_mem_usage=True
+        ).to(device)
+        self.model.eval()
+        self.retrieval = RetrievalEngine()
 
     def generate(self, query, context, image):
-        prompt = self._build_prompt(query, context)
-        formatted = apply_chat_template(self.processor, self.config, prompt, num_images=1)
-        temp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
-                temp_path = Path(temp_file.name)
-                image.convert("RGB").save(temp_file, format="JPEG", quality=92)
-            output = generate(
-                self.model,
-                self.processor,
-                formatted,
-                [str(temp_path)],
-                max_tokens=220,
-                temperature=0.0,
-                verbose=False,
-            )
-        finally:
-            if temp_path:
-                temp_path.unlink(missing_ok=True)
-        return getattr(output, "text", output).strip()
+        caption = self._caption(image)
+        sources = [caption]
+        if context and context.strip():
+            sources.append(context.strip())
+        evidence = self.retrieval.retrieve(query, sources)
+        prompt = self._build_prompt(query, caption, evidence)
+
+        inputs = self._move_inputs(self.processor(images=image, text=prompt, return_tensors="pt"))
+        with self.torch.inference_mode():
+            output = self.model.generate(**inputs, max_new_tokens=220, do_sample=False)
+        generated = output[:, inputs["input_ids"].shape[1] :]
+        answer = self.processor.batch_decode(generated, skip_special_tokens=True)[0].strip()
+        return answer or caption
+
+    def _caption(self, image):
+        inputs = self._move_inputs(self.caption_processor(images=image, return_tensors="pt"))
+        with self.torch.inference_mode():
+            output = self.caption_model.generate(**inputs, max_new_tokens=80)
+        return self.caption_processor.batch_decode(output, skip_special_tokens=True)[0].strip()
+
+    def _move_inputs(self, inputs):
+        return {
+            key: value.to(self.device, dtype=self.dtype) if value.is_floating_point() else value.to(self.device)
+            for key, value in inputs.items()
+        }
 
     @staticmethod
-    def _build_prompt(query, context=None):
-        normalized = query.strip().lower().rstrip("?.!")
-        if normalized in {
-            "what is in this image",
-            "what do you see",
-            "describe this image",
-            "describe the image",
-        }:
-            prompt = (
-                "Describe this image accurately in 2 to 4 complete sentences. Identify the main subjects, "
-                "setting, actions, visible text, spatial relationships, and notable details. Do not guess."
-            )
-        else:
-            prompt = (
-                f"Answer this question about the image clearly and completely: {query.strip()} "
-                "Use only visible evidence. If the answer cannot be determined, say so plainly."
-            )
-        if context:
-            prompt += f" User context: {context.strip()}"
-        return prompt
+    def _build_prompt(query, caption="", retrieved=""):
+        return (
+            "USER: <image>\n"
+            "Answer using the image and the retrieved evidence. "
+            "Be concise, specific, and do not invent details.\n"
+            f"Visual extraction: {caption or 'No caption available.'}\n"
+            f"Retrieved evidence: {retrieved or 'No additional evidence.'}\n"
+            f"Question: {query.strip()}\n"
+            "ASSISTANT:"
+        )

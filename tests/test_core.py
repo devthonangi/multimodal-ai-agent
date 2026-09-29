@@ -70,10 +70,12 @@ class UploadTests(unittest.TestCase):
 
 class LocalReasonerTests(unittest.TestCase):
     def test_model_and_detailed_prompt(self):
-        self.assertEqual(DEFAULT_MODEL, "HuggingFaceTB/SmolVLM-500M-Instruct")
-        prompt = TextReasoner._build_prompt("What is in this image?")
-        self.assertIn("2 to 4 complete sentences", prompt)
-        self.assertIn("Do not guess", prompt)
+        self.assertEqual(DEFAULT_MODEL, "llava-hf/llava-1.5-7b-hf")
+        prompt = TextReasoner._build_prompt(
+            "What is in this image?", "A red car", "A red car on a road"
+        )
+        self.assertIn("Retrieved evidence", prompt)
+        self.assertIn("do not invent details", prompt)
 
 
 if __name__ == "__main__":
