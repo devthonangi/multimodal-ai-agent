@@ -72,7 +72,8 @@ class TextReasoner:
     def _generate_lightweight(self, query, context, image):
         instruction = (
             "Answer the question using only visible evidence in the image. "
-            "Be concise and say when something cannot be determined.\n"
+            "Respond naturally, like a helpful person having a conversation. "
+            "Keep it concise and say when something cannot be determined.\n"
         )
         if context and context.strip():
             instruction += f"Additional context: {context.strip()}\n"
@@ -112,7 +113,7 @@ class TextReasoner:
         return (
             "USER: <image>\n"
             "Answer using the image and the retrieved evidence. "
-            "Be concise, specific, and do not invent details.\n"
+            "Sound natural and conversational. Be concise, specific, and do not invent details.\n"
             f"Visual extraction: {caption or 'No caption available.'}\n"
             f"Retrieved evidence: {retrieved or 'No additional evidence.'}\n"
             f"Question: {query.strip()}\n"

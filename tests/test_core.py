@@ -49,6 +49,12 @@ class AgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "empty"):
             agent.process_bytes(image_bytes(), "   ")
 
+    def test_greeting_is_conversational_without_loading_model(self):
+        agent = MultimodalAgent(device="cpu", model_name="fake", reasoner_factory=FakeReasoner)
+        answer = agent.process_bytes(image_bytes(), "Hi!")
+        self.assertEqual(answer, "Hi! What would you like to know about this image?")
+        self.assertFalse(agent.is_loaded)
+
 
 class CacheTests(unittest.TestCase):
     def test_lru_eviction(self):

@@ -10,6 +10,9 @@ from inference.text_reasoner import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, TextR
 from utils.cache_manager import CacheManager
 
 
+GREETINGS = {"hello", "hey", "hi", "hi there", "hey there", "hello there"}
+
+
 def select_device(requested="auto"):
     requested = requested or "auto"
     if requested != "auto":
@@ -65,6 +68,8 @@ class MultimodalAgent:
         query = query.strip()
         if not query:
             raise ValueError("Question cannot be empty")
+        if query.lower().strip(" .,!?;:") in GREETINGS:
+            return "Hi! What would you like to know about this image?"
         image = image.convert("RGB")
         digest = hashlib.sha256(image.tobytes()).hexdigest()
         key = (digest, query, context or "", self.provider, self.model_name)
