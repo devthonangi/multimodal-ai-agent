@@ -1,12 +1,19 @@
 import hashlib
+import importlib.util
 import io
 import os
+import platform
 from pathlib import Path
 from threading import RLock
 
 from PIL import Image
 
-from inference.text_reasoner import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, TextReasoner
+from inference.text_reasoner import (
+    DEFAULT_FALLBACK_MODEL,
+    DEFAULT_MLX_MODEL,
+    DEFAULT_MODEL,
+    TextReasoner,
+)
 from utils.cache_manager import CacheManager
 
 
@@ -17,6 +24,12 @@ def select_device(requested="auto"):
     requested = requested or "auto"
     if requested != "auto":
         return requested
+    if (
+        platform.system() == "Darwin"
+        and platform.machine() == "arm64"
+        and importlib.util.find_spec("mlx_vlm") is not None
+    ):
+        return "mlx"
     try:
         import torch
 
@@ -34,10 +47,14 @@ class MultimodalAgent:
 
     def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
         self.device = select_device(device or os.getenv("AGENT_DEVICE", "auto"))
-        self.provider = "pytorch-transformers"
+        self.provider = "mlx-vlm" if self.device == "mlx" else "pytorch-transformers"
         configured_model = os.getenv("AGENT_MODEL")
         self.model_name = model_name or configured_model or (
-            DEFAULT_MODEL if self.device == "cuda" else DEFAULT_FALLBACK_MODEL
+            DEFAULT_MODEL
+            if self.device == "cuda"
+            else DEFAULT_MLX_MODEL
+            if self.device == "mlx"
+            else DEFAULT_FALLBACK_MODEL
         )
         self.cache = CacheManager(cache_size)
         self._reasoner_factory = reasoner_factory

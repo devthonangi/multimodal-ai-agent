@@ -1,4 +1,6 @@
 import os
+import tempfile
+from pathlib import Path
 
 from utils.rag_utils import RetrievalEngine
 
@@ -6,17 +8,26 @@ from utils.rag_utils import RetrievalEngine
 DEFAULT_MODEL = "llava-hf/llava-1.5-7b-hf"
 DEFAULT_CAPTION_MODEL = "Salesforce/blip2-opt-2.7b"
 DEFAULT_FALLBACK_MODEL = "Salesforce/blip-vqa-base"
+DEFAULT_MLX_MODEL = "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"
 
 
 class TextReasoner:
     """BLIP-2 visual extraction, FAISS retrieval, and LLaVA reasoning."""
 
     def __init__(self, device, model_name=DEFAULT_MODEL):
+        self.device = device
+        self.model_name = model_name
+        self.mlx = device == "mlx"
+        if self.mlx:
+            from mlx_vlm import load
+
+            print(f"[model] Loading {model_name} with MLX")
+            self.model, self.processor = load(model_name)
+            return
+
         import torch
         from transformers import AutoProcessor, Blip2ForConditionalGeneration, LlavaForConditionalGeneration
 
-        self.device = device
-        self.model_name = model_name
         self.caption_model_name = os.getenv("CAPTION_MODEL", DEFAULT_CAPTION_MODEL)
         self.torch = torch
         self.dtype = torch.float16 if device == "cuda" else torch.float32
@@ -60,6 +71,8 @@ class TextReasoner:
         self.retrieval = RetrievalEngine()
 
     def generate(self, query, context, image):
+        if self.mlx:
+            return self._generate_mlx(query, context, image)
         if self.lightweight:
             return self._generate_lightweight(query, context, image)
 
@@ -76,6 +89,42 @@ class TextReasoner:
         generated = output[:, inputs["input_ids"].shape[1] :]
         answer = self.processor.batch_decode(generated, skip_special_tokens=True)[0].strip()
         return answer or caption
+
+    def _generate_mlx(self, query, context, image):
+        from mlx_vlm import apply_chat_template, generate
+
+        history = context.strip() if context and context.strip() else "No previous turns."
+        prompt = (
+            "You are a conversational visual assistant. Answer only from visible image evidence. "
+            "Use the conversation history to understand follow-ups, but independently verify every "
+            "claim against the image. Never invent objects, text, actions, emotions, or thoughts. "
+            "If something is unclear or not visible, say so. If asked for a description, give a "
+            "complete description covering the subject, appearance, pose, clothing, background, "
+            "visible objects, and readable text. If a question is unrelated to the image, politely "
+            "redirect the user. Respond naturally in complete sentences.\n\n"
+            f"Conversation history:\n{history}\n\nCurrent question: {query.strip()}"
+        )
+        formatted = apply_chat_template(
+            self.processor, self.model.config, prompt, num_images=1
+        )
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+                temp_path = Path(temp_file.name)
+                image.convert("RGB").save(temp_file, format="PNG")
+            output = generate(
+                self.model,
+                self.processor,
+                formatted,
+                image=[str(temp_path)],
+                max_tokens=260,
+                temperature=0.0,
+                verbose=False,
+            )
+        finally:
+            if temp_path:
+                temp_path.unlink(missing_ok=True)
+        return getattr(output, "text", output).strip()
 
     def _generate_lightweight(self, query, context, image):
         normalized = query.lower().strip(" .,!?;:")
