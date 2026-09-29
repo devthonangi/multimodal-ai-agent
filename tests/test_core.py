@@ -5,7 +5,7 @@ from PIL import Image
 
 from app import validate_image
 from inference.multimodal_agent import MultimodalAgent
-from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
+from inference.text_reasoner import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
@@ -76,6 +76,10 @@ class LocalReasonerTests(unittest.TestCase):
         )
         self.assertIn("Retrieved evidence", prompt)
         self.assertIn("do not invent details", prompt)
+
+    def test_cpu_uses_lightweight_fallback(self):
+        agent = MultimodalAgent(device="cpu", reasoner_factory=FakeReasoner)
+        self.assertEqual(agent.model_name, DEFAULT_FALLBACK_MODEL)
 
 
 if __name__ == "__main__":

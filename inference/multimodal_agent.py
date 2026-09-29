@@ -6,7 +6,7 @@ from threading import RLock
 
 from PIL import Image
 
-from inference.text_reasoner import DEFAULT_MODEL, TextReasoner
+from inference.text_reasoner import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, TextReasoner
 from utils.cache_manager import CacheManager
 
 
@@ -32,7 +32,10 @@ class MultimodalAgent:
     def __init__(self, device=None, model_name=None, cache_size=128, reasoner_factory=TextReasoner):
         self.device = select_device(device or os.getenv("AGENT_DEVICE", "auto"))
         self.provider = "pytorch-transformers"
-        self.model_name = model_name or os.getenv("AGENT_MODEL", DEFAULT_MODEL)
+        configured_model = os.getenv("AGENT_MODEL")
+        self.model_name = model_name or configured_model or (
+            DEFAULT_MODEL if self.device == "cuda" else DEFAULT_FALLBACK_MODEL
+        )
         self.cache = CacheManager(cache_size)
         self._reasoner_factory = reasoner_factory
         self._reasoner = None
