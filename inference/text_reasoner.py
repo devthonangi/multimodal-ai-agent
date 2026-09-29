@@ -73,7 +73,9 @@ class TextReasoner:
         instruction = (
             "Answer the question using only visible evidence in the image. "
             "Respond naturally, like a helpful person having a conversation. "
-            "Keep it concise and say when something cannot be determined.\n"
+            "Answer directly in one or two complete sentences. Do not reply with another question "
+            "unless clarification is truly necessary. Keep it concise and say when something "
+            "cannot be determined.\n"
         )
         if context and context.strip():
             instruction += f"Additional context: {context.strip()}\n"
@@ -113,7 +115,9 @@ class TextReasoner:
         return (
             "USER: <image>\n"
             "Answer using the image and the retrieved evidence. "
-            "Sound natural and conversational. Be concise, specific, and do not invent details.\n"
+            "Sound natural and conversational. Answer directly in one or two complete sentences, "
+            "and do not respond with an unrelated follow-up question. Be specific and do not "
+            "invent details.\n"
             f"Visual extraction: {caption or 'No caption available.'}\n"
             f"Retrieved evidence: {retrieved or 'No additional evidence.'}\n"
             f"Question: {query.strip()}\n"

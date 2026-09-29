@@ -82,6 +82,8 @@ class LocalReasonerTests(unittest.TestCase):
         )
         self.assertIn("Retrieved evidence", prompt)
         self.assertIn("do not invent details", prompt)
+        self.assertIn("natural and conversational", prompt)
+        self.assertIn("Answer directly", prompt)
 
     def test_cpu_uses_lightweight_fallback(self):
         agent = MultimodalAgent(device="cpu", reasoner_factory=FakeReasoner)
